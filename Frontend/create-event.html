@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criar Evento - SpaceEventHub</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <a href="index.html" class="logo">SpaceEventHub</a>
+                <div class="nav-links" id="navLinks">
+                    <a href="index.html">Eventos</a>
+                    <a href="dashboard.html" id="dashboardLink" style="display: none;">Painel</a>
+                    <a href="create-event.html" id="createEventLink" style="display: none;">+ Criar Evento</a>
+                    <a href="login.html" id="loginLink">Entrar</a>
+                    <a href="register.html" id="registerLink">Cadastrar</a>
+                    <button id="logoutBtn" style="display: none;">Sair</button>
+                    <div class="notification-icon" id="notificationIcon" style="display: none;">
+                        🔔
+                        <span class="notification-badge" id="notificationBadge">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="notification-dropdown" id="notificationDropdown">
+        <div class="notification-header">
+            <h3>Notificações</h3>
+            <button id="markAllReadBtn">Marcar todas como lidas</button>
+        </div>
+        <div class="notification-list" id="notificationList">
+            <p class="no-notifications">Sem notificações</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="auth-container" style="max-width: 800px; margin-top: 3rem;">
+            <h1>Criar Novo Evento</h1>
+            <div id="errorMessage" class="error" style="display: none;"></div>
+            <div id="successMessage" class="success" style="display: none;"></div>
+            <form id="createEventForm">
+                <div class="form-group">
+                    <label for="title">Título do Evento *</label>
+                    <input type="text" id="title" name="title" required maxlength="200">
+                </div>
+                <div class="form-group">
+                    <label for="description">Descrição *</label>
+                    <textarea id="description" name="description" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="eventDate">Data e Hora do Evento *</label>
+                    <input type="datetime-local" id="eventDate" name="eventDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="city">Cidade *</label>
+                    <input type="text" id="city" name="city" required maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label for="location">Local/Endereço *</label>
+                    <input type="text" id="location" name="location" required maxlength="300" placeholder="ex: Centro de Convenções, Rua Principal, 123">
+                </div>
+                <div class="form-group">
+                    <label for="areaOfInterest">Área de Interesse *</label>
+                    <select id="areaOfInterest" name="areaOfInterest" required>
+                        <option value="">Selecione uma área</option>
+                        <option value="AI">IA</option>
+                        <option value="Backend">Backend</option>
+                        <option value="Frontend">Frontend</option>
+                        <option value="UX">UX</option>
+                        <option value="DevOps">DevOps</option>
+                        <option value="Mobile">Mobile</option>
+                        <option value="Data">Ciência de Dados</option>
+                        <option value="Cloud">Computação em Nuvem</option>
+                        <option value="Security">Segurança</option>
+                        <option value="Other">Outro</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="registrationLink">Link de Inscrição Externo (Opcional)</label>
+                    <input type="url" id="registrationLink" name="registrationLink" maxlength="500" placeholder="https://exemplo.com/inscricao">
+                    <small style="color: #999;">Se você tiver uma página de inscrição externa</small>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button type="submit" class="btn">Criar Evento</button>
+                    <a href="dashboard.html" class="btn secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 SpaceEventHub. Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+    <script>
+        // Track page view
+        trackPageView('/create-event');
+
+        // Initialize navigation
+        initializeNav();
+
+        // Check authentication and role
+        if (!isAuthenticated()) {
+            window.location.href = 'login.html';
+        }
+
+        const user = getCurrentUser();
+        if (!user || (user.role !== 'Organizer' && user.role !== 'Admin')) {
+            alert('Você precisa ser um organizador para criar eventos');
+            window.location.href = 'dashboard.html';
+        }
+
+        document.getElementById('createEventForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                title: document.getElementById('title').value,
+                description: document.getElementById('description').value,
+                eventDate: document.getElementById('eventDate').value,
+                city: document.getElementById('city').value,
+                location: document.getElementById('location').value,
+                areaOfInterest: document.getElementById('areaOfInterest').value,
+                registrationLink: document.getElementById('registrationLink').value || null
+            };
+
+            try {
+                const response = await apiRequest('/events', {
+                    method: 'POST',
+                    body: JSON.stringify(formData)
+                });
+
+                showSuccess('Evento criado com sucesso! Você receberá um email de confirmação e uma notificação.');
+                
+                setTimeout(() => {
+                    window.location.href = 'dashboard.html';
+                }, 2000);
+            } catch (error) {
+                showError(error.message || 'Falha ao criar evento. Tente novamente.');
+            }
+        });
+    </script>
+</body>
+</html>

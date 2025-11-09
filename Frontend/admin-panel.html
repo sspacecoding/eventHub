@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Administrativo - SpaceEventHub</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <a href="index.html" class="logo">SpaceEventHub</a>
+                <div class="nav-links">
+                    <a href="index.html">Eventos</a>
+                    <a href="dashboard.html">Painel</a>
+                    <a href="analytics.html">Análises</a>
+                    <button id="logoutBtn">Sair</button>
+                    <div class="notification-icon" id="notificationIcon">
+                        🔔
+                        <span class="notification-badge" id="notificationBadge">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="notification-dropdown" id="notificationDropdown">
+        <div class="notification-header">
+            <h3>Notificações</h3>
+            <button id="markAllReadBtn">Marcar todas como lidas</button>
+        </div>
+        <div class="notification-list" id="notificationList">
+            <p class="no-notifications">Sem notificações</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-header">
+            <h1>Visualizar Banco de Dados</h1>
+            <p>Navegar por todas as tabelas do banco de dados</p>
+        </div>
+
+        <div id="databaseView" class="loading">Carregando tabelas do banco de dados...</div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 SpaceEventHub. Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+    <script>
+        // Track page view
+        trackPageView('/admin-panel');
+
+        // Check authentication and role
+        if (!isAuthenticated()) {
+            window.location.href = 'login.html';
+        }
+
+        const user = getCurrentUser();
+        if (!user || user.role !== 'Admin') {
+            alert('Access denied. Admin only.');
+            window.location.href = 'dashboard.html';
+        }
+
+        loadDatabaseView();
+
+        async function loadDatabaseView() {
+            try {
+                const tables = await apiRequest('/admin/database-view');
+                displayDatabaseTables(tables);
+            } catch (error) {
+                console.error('Error loading database view:', error);
+                document.getElementById('databaseView').innerHTML = '<p class="error">Falha ao carregar tabelas do banco de dados</p>';
+            }
+        }
+
+        function displayDatabaseTables(tables) {
+            const container = document.getElementById('databaseView');
+            
+            if (tables.length === 0) {
+                container.innerHTML = '<p class="no-events">Nenhuma tabela encontrada</p>';
+                return;
+            }
+            
+            container.innerHTML = tables.map(table => {
+                if (table.rows.length === 0) {
+                    return `
+                        <div class="table-container">
+                            <h2 style="color: var(--text-white); padding: 1rem;">${table.tableName}</h2>
+                            <p style="padding: 1rem; color: #999;">Nenhum dado disponível</p>
+                        </div>
+                    `;
+                }
+
+                const columns = Object.keys(table.rows[0]);
+                
+                return `
+                    <div class="table-container">
+                        <h2 style="color: var(--text-white); padding: 1rem; background-color: var(--tertiary-bg);">
+                            ${table.tableName} (${table.rows.length} ${table.rows.length === 1 ? 'linha' : 'linhas'})
+                        </h2>
+                        <div style="overflow-x: auto;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        ${columns.map(col => `<th>${col}</th>`).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${table.rows.map(row => `
+                                        <tr>
+                                            ${columns.map(col => `<td>${formatValue(row[col])}</td>`).join('')}
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function formatValue(value) {
+            if (value === null || value === undefined) {
+                return '<span style="color: #999;">NULL</span>';
+            }
+            if (typeof value === 'boolean') {
+                return value ? '<span style="color: #44ff44;">✓</span>' : '<span style="color: #ff4444;">✗</span>';
+            }
+            if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T/)) {
+                // Format datetime
+                const date = new Date(value);
+                return date.toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+            return escapeHtml(String(value));
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

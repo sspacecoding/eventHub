@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrar - SpaceEventHub</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <a href="index.html" class="logo">SpaceEventHub</a>
+                <div class="nav-links">
+                    <a href="index.html">Eventos</a>
+                    <a href="register.html">Cadastrar</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="auth-container">
+            <h1>Entrar</h1>
+            <div id="errorMessage" class="error" style="display: none;"></div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Senha</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" class="btn">Entrar</button>
+            </form>
+            <div class="auth-links">
+                <p>Não tem uma conta? <a href="register.html">Cadastre-se aqui</a></p>
+                <p style="margin-top: 1rem; color: #999; font-size: 0.9rem;">
+                    Contas de demonstração:<br>
+                    Admin: admin@spaceeventhub.com / Admin@123<br>
+                    Organizador: organizer@spaceeventhub.com / Organizer@123<br>
+                    Participante: attendee@spaceeventhub.com / Attendee@123
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 SpaceEventHub. Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+    <script>
+        // Track page view
+        trackPageView('/login');
+
+        // Redirect if already logged in
+        if (isAuthenticated()) {
+            window.location.href = 'dashboard.html';
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await apiRequest('/auth/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ email, password })
+                });
+
+                setToken(response.token);
+                setCurrentUser(response.user);
+
+                window.location.href = 'dashboard.html';
+            } catch (error) {
+                showError(error.message || 'Falha no login. Verifique suas credenciais.');
+            }
+        });
+    </script>
+</body>
+</html>

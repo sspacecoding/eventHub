@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análises - SpaceEventHub</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <a href="index.html" class="logo">SpaceEventHub</a>
+                <div class="nav-links">
+                    <a href="index.html">Eventos</a>
+                    <a href="dashboard.html">Painel</a>
+                    <a href="admin-panel.html">Visualizar Banco</a>
+                    <button id="logoutBtn">Sair</button>
+                    <div class="notification-icon" id="notificationIcon">
+                        🔔
+                        <span class="notification-badge" id="notificationBadge">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="notification-dropdown" id="notificationDropdown">
+        <div class="notification-header">
+            <h3>Notificações</h3>
+            <button id="markAllReadBtn">Marcar todas como lidas</button>
+        </div>
+        <div class="notification-list" id="notificationList">
+            <p class="no-notifications">Sem notificações</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-header">
+            <h1>Painel de Análises</h1>
+            <p>Estatísticas e insights da plataforma</p>
+        </div>
+
+        <div id="statsContainer" class="loading">Carregando estatísticas...</div>
+
+        <div class="chart-container">
+            <h2>Visualizações de Página (Últimos 7 Dias)</h2>
+            <canvas id="pageViewsChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h2>Top Eventos por Inscrições</h2>
+            <canvas id="registrationsChart"></canvas>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 SpaceEventHub. Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+    <script>
+        // Track page view
+        trackPageView('/analytics');
+
+        // Check authentication and role
+        if (!isAuthenticated()) {
+            window.location.href = 'login.html';
+        }
+
+        const user = getCurrentUser();
+        if (!user || user.role !== 'Admin') {
+            alert('Acesso negado. Apenas administradores.');
+            window.location.href = 'dashboard.html';
+        }
+
+        let pageViewsChart, registrationsChart;
+
+        loadAnalytics();
+
+        async function loadAnalytics() {
+            try {
+                const [overview, pageViews, registrations] = await Promise.all([
+                    apiRequest('/analytics/overview'),
+                    apiRequest('/analytics/page-views?days=7'),
+                    apiRequest('/analytics/registrations')
+                ]);
+
+                // Handle array responses (ASP.NET Core sometimes wraps arrays)
+                const pageViewsData = Array.isArray(pageViews) ? pageViews : (pageViews?.value || pageViews || []);
+                const registrationsData = Array.isArray(registrations) ? registrations : (registrations?.value || registrations || []);
+
+                displayOverview(overview);
+                displayPageViewsChart(pageViewsData);
+                displayRegistrationsChart(registrationsData);
+            } catch (error) {
+                console.error('Error loading analytics:', error);
+                document.getElementById('statsContainer').innerHTML = '<p class="error">Falha ao carregar análises: ' + error.message + '</p>';
+            }
+        }
+
+        function displayOverview(stats) {
+            const container = document.getElementById('statsContainer');
+            container.innerHTML = `
+                <div class="dashboard-grid">
+                    <div class="dashboard-card">
+                        <h2>Total de Usuários</h2>
+                        <div class="stat-value">${stats.totalUsers}</div>
+                        <div class="stat-label">Usuários Registrados</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <h2>Total de Eventos</h2>
+                        <div class="stat-value">${stats.totalEvents}</div>
+                        <div class="stat-label">${stats.activeEvents} Eventos Ativos</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <h2>Inscrições em Eventos</h2>
+                        <div class="stat-value">${stats.totalRegistrations}</div>
+                        <div class="stat-label">Total de Inscrições</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <h2>Visualizações</h2>
+                        <div class="stat-value">${stats.totalPageViews}</div>
+                        <div class="stat-label">${stats.totalVisitors} Visitantes Únicos</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayPageViewsChart(data) {
+            if (!data || !Array.isArray(data) || data.length === 0) {
+                document.getElementById('pageViewsChart').parentElement.innerHTML = '<p style="color: #999; text-align: center; padding: 2rem;">Nenhum dado de visualização disponível</p>';
+                return;
+            }
+
+            const ctx = document.getElementById('pageViewsChart').getContext('2d');
+            
+            if (pageViewsChart) {
+                pageViewsChart.destroy();
+            }
+
+            pageViewsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.date),
+                    datasets: [{
+                        label: 'Visualizações',
+                        data: data.map(d => d.viewCount),
+                        borderColor: 'rgb(0, 0, 255)',
+                        backgroundColor: 'rgba(0, 0, 255, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#E0E0E0'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#E0E0E0',
+                                precision: 0
+                            },
+                            grid: {
+                                color: '#333333'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#E0E0E0'
+                            },
+                            grid: {
+                                color: '#333333'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function displayRegistrationsChart(data) {
+            if (!data || !Array.isArray(data) || data.length === 0) {
+                document.getElementById('registrationsChart').parentElement.innerHTML = '<p style="color: #999; text-align: center; padding: 2rem;">Nenhum dado de inscrição disponível</p>';
+                return;
+            }
+
+            const ctx = document.getElementById('registrationsChart').getContext('2d');
+            
+            if (registrationsChart) {
+                registrationsChart.destroy();
+            }
+
+            registrationsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.eventTitle),
+                    datasets: [{
+                        label: 'Inscrições',
+                        data: data.map(d => d.registrationCount),
+                        backgroundColor: 'rgba(0, 0, 255, 0.8)',
+                        borderColor: 'rgb(0, 0, 255)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#E0E0E0'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: {
+                                color: '#E0E0E0'
+                            },
+                            grid: {
+                                color: '#333333'
+                            }
+                        },
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#E0E0E0',
+                                precision: 0
+                            },
+                            grid: {
+                                color: '#333333'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+@SpaceEventHub.API_HostAddress = http://localhost:5294
+
+GET {{SpaceEventHub.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

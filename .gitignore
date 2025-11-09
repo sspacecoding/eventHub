@@ -25,4 +25,8 @@ Desktop.ini
 *.bak
 *.swp
 
+# Documentation (manter apenas README)
+*.md
+!README.md
+
 

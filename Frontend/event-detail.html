@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalhes do Evento - SpaceEventHub</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <a href="index.html" class="logo">SpaceEventHub</a>
+                <div class="nav-links" id="navLinks">
+                    <a href="index.html">Eventos</a>
+                    <a href="dashboard.html" id="dashboardLink" style="display: none;">Painel</a>
+                    <a href="login.html" id="loginLink">Entrar</a>
+                    <a href="register.html" id="registerLink">Cadastrar</a>
+                    <button id="logoutBtn" style="display: none;">Sair</button>
+                    <div class="notification-icon" id="notificationIcon" style="display: none;">
+                        🔔
+                        <span class="notification-badge" id="notificationBadge">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="notification-dropdown" id="notificationDropdown">
+        <div class="notification-header">
+            <h3>Notificações</h3>
+            <button id="markAllReadBtn">Marcar todas como lidas</button>
+        </div>
+        <div class="notification-list" id="notificationList">
+            <p class="no-notifications">Sem notificações</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="eventDetail" class="loading">Carregando detalhes do evento...</div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 SpaceEventHub. Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const eventId = urlParams.get('id');
+
+        if (!eventId) {
+            window.location.href = 'index.html';
+        }
+
+        // Track page view
+        trackPageView(`/event/${eventId}`);
+
+        loadEventDetail();
+
+        async function loadEventDetail() {
+            try {
+                const event = await apiRequest(`/events/${eventId}`);
+                displayEventDetail(event);
+            } catch (error) {
+                console.error('Error loading event:', error);
+                document.getElementById('eventDetail').innerHTML = '<p class="error">Falha ao carregar detalhes do evento</p>';
+            }
+        }
+
+        function displayEventDetail(event) {
+            const container = document.getElementById('eventDetail');
+            const isAuth = isAuthenticated();
+
+            container.innerHTML = `
+                <div style="margin: 3rem 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 2rem;">
+                        <div>
+                            <span class="event-badge" style="position: static; display: inline-block; margin-bottom: 1rem;">${event.areaOfInterest}</span>
+                            <h1 style="color: var(--text-white); margin-bottom: 1rem;">${escapeHtml(event.title)}</h1>
+                            <p style="color: var(--text-light); font-size: 1.1rem;">Organizado por ${escapeHtml(event.organizerName)}</p>
+                        </div>
+                        ${event.isUserRegistered ? 
+                            `<button id="unregisterBtn" class="btn secondary">Cancelar Inscrição</button>` :
+                            isAuth ? 
+                                `<button id="registerBtn" class="btn">Inscrever-se no Evento</button>` :
+                                `<a href="login.html" class="btn">Entrar para Inscrever-se</a>`
+                        }
+                    </div>
+
+                    <div class="dashboard-card" style="margin-bottom: 2rem;">
+                        <h2>Detalhes do Evento</h2>
+                        <div style="margin-top: 1.5rem;">
+                            <div class="detail-item" style="margin-bottom: 1rem; font-size: 1.1rem;">
+                                <span class="icon">📅</span>
+                                <span>${formatDate(event.eventDate)}</span>
+                            </div>
+                            <div class="detail-item" style="margin-bottom: 1rem; font-size: 1.1rem;">
+                                <span class="icon">📍</span>
+                                <span>${escapeHtml(event.city)} - ${escapeHtml(event.location)}</span>
+                            </div>
+                            <div class="detail-item" style="margin-bottom: 1rem; font-size: 1.1rem;">
+                                <span class="icon">👥</span>
+                                <span>${event.registrationCount} pessoas inscritas</span>
+                            </div>
+                            ${event.registrationLink ? `
+                                <div class="detail-item" style="margin-bottom: 1rem; font-size: 1.1rem;">
+                                    <span class="icon">🔗</span>
+                                    <a href="${escapeHtml(event.registrationLink)}" target="_blank" style="color: var(--primary-blue);">Link de Inscrição Externo</a>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card">
+                        <h2>Descrição</h2>
+                        <p style="margin-top: 1rem; line-height: 1.8; white-space: pre-wrap;">${escapeHtml(event.description)}</p>
+                    </div>
+
+                    <div style="margin-top: 2rem;">
+                        <a href="index.html" class="btn secondary">← Voltar para Eventos</a>
+                    </div>
+                </div>
+            `;
+
+            // Add event listeners for register/unregister
+            const registerBtn = document.getElementById('registerBtn');
+            const unregisterBtn = document.getElementById('unregisterBtn');
+
+            if (registerBtn) {
+                registerBtn.addEventListener('click', async () => {
+                    try {
+                        await apiRequest(`/events/${eventId}/register`, { method: 'POST' });
+                        showSuccess('Inscrito no evento com sucesso!');
+                        setTimeout(() => location.reload(), 1500);
+                    } catch (error) {
+                        showError(error.message || 'Falha ao se inscrever no evento');
+                    }
+                });
+            }
+
+            if (unregisterBtn) {
+                unregisterBtn.addEventListener('click', async () => {
+                    if (confirm('Tem certeza que deseja cancelar sua inscrição neste evento?')) {
+                        try {
+                            await apiRequest(`/events/${eventId}/register`, { method: 'DELETE' });
+                            showSuccess('Inscrição cancelada com sucesso');
+                            setTimeout(() => location.reload(), 1500);
+                        } catch (error) {
+                            showError(error.message || 'Falha ao cancelar inscrição no evento');
+                        }
+                    }
+                });
+            }
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('pt-BR', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showSuccess(message) {
+            const container = document.getElementById('eventDetail');
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.textContent = message;
+            container.insertBefore(successDiv, container.firstChild);
+        }
+
+        function showError(message) {
+            const container = document.getElementById('eventDetail');
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            container.insertBefore(errorDiv, container.firstChild);
+        }
+    </script>
+</body>
+</html>

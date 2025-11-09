@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel - SpaceEventHub</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <a href="index.html" class="logo">SpaceEventHub</a>
+                <div class="nav-links" id="navLinks">
+                    <a href="index.html">Eventos</a>
+                    <a href="dashboard.html" id="dashboardLink" style="display: none;">Painel</a>
+                    <a href="create-event.html" id="createEventLink" style="display: none;">+ Criar Evento</a>
+                    <a href="login.html" id="loginLink">Entrar</a>
+                    <a href="register.html" id="registerLink">Cadastrar</a>
+                    <button id="logoutBtn" style="display: none;">Sair</button>
+                    <div class="notification-icon" id="notificationIcon" style="display: none;">
+                        🔔
+                        <span class="notification-badge" id="notificationBadge">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="notification-dropdown" id="notificationDropdown">
+        <div class="notification-header">
+            <h3>Notificações</h3>
+            <button id="markAllReadBtn">Marcar todas como lidas</button>
+        </div>
+        <div class="notification-list" id="notificationList">
+            <p class="no-notifications">Sem notificações</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-header">
+            <h1 id="welcomeMessage">Bem-vindo</h1>
+            <p id="roleMessage"></p>
+        </div>
+
+        <!-- Attendee Dashboard -->
+        <div id="attendeeDashboard" style="display: none;">
+            <h2 style="color: var(--text-white); margin-bottom: 2rem;">Meus Eventos Inscritos</h2>
+            <div id="myRegistrations" class="loading">Carregando suas inscrições...</div>
+        </div>
+
+        <!-- Organizer Dashboard -->
+        <div id="organizerDashboard" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2 style="color: var(--text-white);">Meus Eventos</h2>
+                <a href="create-event.html" class="btn">+ Criar Novo Evento</a>
+            </div>
+            <div id="myEvents" class="loading">Carregando seus eventos...</div>
+        </div>
+
+        <!-- Admin Dashboard -->
+        <div id="adminDashboard" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2 style="color: var(--text-white);">Painel Administrativo</h2>
+                <div>
+                    <a href="analytics.html" class="btn">📊 Análises</a>
+                    <a href="admin-panel.html" class="btn" style="margin-left: 1rem;">🗄️ Visualizar Banco</a>
+                </div>
+            </div>
+            <div id="adminStats" class="loading">Carregando estatísticas...</div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 SpaceEventHub. Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+    <script>
+        // Track page view
+        trackPageView('/dashboard');
+
+        // Initialize navigation
+        initializeNav();
+
+        // Check authentication
+        if (!isAuthenticated()) {
+            window.location.href = 'login.html';
+        }
+
+        const user = getCurrentUser();
+        if (!user) {
+            window.location.href = 'login.html';
+        }
+
+        // Display welcome message
+        document.getElementById('welcomeMessage').textContent = `Bem-vindo, ${user.firstName}!`;
+        const roleNames = {
+            'Admin': 'Administrador',
+            'Organizer': 'Organizador',
+            'Attendee': 'Participante'
+        };
+        document.getElementById('roleMessage').textContent = `Função: ${roleNames[user.role] || user.role}`;
+
+        // Show appropriate dashboard based on role
+        if (user.role === 'Attendee') {
+            document.getElementById('attendeeDashboard').style.display = 'block';
+            loadMyRegistrations();
+        } else if (user.role === 'Organizer') {
+            document.getElementById('organizerDashboard').style.display = 'block';
+            loadMyEvents();
+        } else if (user.role === 'Admin') {
+            document.getElementById('adminDashboard').style.display = 'block';
+            loadAdminStats();
+        }
+
+        async function loadMyRegistrations() {
+            try {
+                const registrations = await apiRequest('/events/my-registrations');
+                displayRegistrations(registrations);
+            } catch (error) {
+                console.error('Error loading registrations:', error);
+                document.getElementById('myRegistrations').innerHTML = '<p class="error">Falha ao carregar inscrições</p>';
+            }
+        }
+
+        function displayRegistrations(registrations) {
+            const container = document.getElementById('myRegistrations');
+            
+            if (registrations.length === 0) {
+                container.innerHTML = '<p class="no-events">Você ainda não se inscreveu em nenhum evento. <a href="index.html" style="color: var(--primary-blue);">Explorar eventos</a></p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="events-grid">
+                    ${registrations.map(reg => `
+                        <div class="event-card">
+                            <div class="event-badge">${reg.event.areaOfInterest}</div>
+                            <h3>${escapeHtml(reg.event.title)}</h3>
+                            <p class="event-description">${escapeHtml(reg.event.description)}</p>
+                            <div class="event-details">
+                                <div class="detail-item">
+                                    <span class="icon">📅</span>
+                                    <span>${formatDate(reg.event.eventDate)}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="icon">📍</span>
+                                    <span>${escapeHtml(reg.event.city)}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="icon">✓</span>
+                                    <span>Inscrito em ${formatDate(reg.registeredAt)}</span>
+                                </div>
+                            </div>
+                            <div class="event-actions">
+                                <a href="event-detail.html?id=${reg.event.eventId}" class="btn">Ver Detalhes</a>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        async function loadMyEvents() {
+            try {
+                const events = await apiRequest('/events/my-events');
+                displayMyEvents(events);
+            } catch (error) {
+                console.error('Error loading events:', error);
+                document.getElementById('myEvents').innerHTML = '<p class="error">Falha ao carregar eventos</p>';
+            }
+        }
+
+        function displayMyEvents(events) {
+            const container = document.getElementById('myEvents');
+            
+            if (events.length === 0) {
+                container.innerHTML = '<p class="no-events">Você ainda não criou nenhum evento. <a href="create-event.html" style="color: var(--primary-blue);">Criar seu primeiro evento</a></p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="events-grid">
+                    ${events.map(event => `
+                        <div class="event-card">
+                            <div class="event-badge">${event.areaOfInterest}</div>
+                            <h3>${escapeHtml(event.title)}</h3>
+                            <p class="event-description">${escapeHtml(event.description)}</p>
+                            <div class="event-details">
+                                <div class="detail-item">
+                                    <span class="icon">📅</span>
+                                    <span>${formatDate(event.eventDate)}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="icon">📍</span>
+                                    <span>${escapeHtml(event.city)}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="icon">👥</span>
+                                    <span>${event.registrationCount} inscritos</span>
+                                </div>
+                            </div>
+                            <div class="event-actions">
+                                <a href="event-detail.html?id=${event.eventId}" class="btn">Ver Detalhes</a>
+                                <a href="edit-event.html?id=${event.eventId}" class="btn secondary">Editar</a>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        async function loadAdminStats() {
+            try {
+                const stats = await apiRequest('/analytics/overview');
+                displayAdminStats(stats);
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                document.getElementById('adminStats').innerHTML = '<p class="error">Falha ao carregar estatísticas</p>';
+            }
+        }
+
+        function displayAdminStats(stats) {
+            const container = document.getElementById('adminStats');
+            container.innerHTML = `
+                <div class="dashboard-grid">
+                    <div class="dashboard-card">
+                        <h2>Total de Usuários</h2>
+                        <div class="stat-value">${stats.totalUsers}</div>
+                        <div class="stat-label">Usuários Registrados</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <h2>Total de Eventos</h2>
+                        <div class="stat-value">${stats.totalEvents}</div>
+                        <div class="stat-label">${stats.activeEvents} Ativos</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <h2>Inscrições</h2>
+                        <div class="stat-value">${stats.totalRegistrations}</div>
+                        <div class="stat-label">Total de Inscrições em Eventos</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <h2>Visualizações</h2>
+                        <div class="stat-value">${stats.totalPageViews}</div>
+                        <div class="stat-label">${stats.totalVisitors} Visitantes Únicos</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('pt-BR', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

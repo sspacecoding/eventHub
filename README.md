@@ -80,6 +80,98 @@ python -m http.server 8080
 npx http-server Frontend -p 8080
 ```
 
+## Deploy em produção
+
+### Docker (recomendado)
+
+```bash
+docker-compose -f docker-compose.yml up -d
+# Para desligar
+docker-compose down
+```
+
+Serviços:
+- `sqlserver`: SQL Server Express (altere `SA_PASSWORD` antes de ir para produção).
+- `backend`: ASP.NET Core rodando em `http://localhost:5000`.
+- `frontend`: Nginx servindo o diretório `Frontend/` em `http://localhost:8080`.
+
+### Azure App Service + Static Web Apps
+
+1. **Publicar API**
+   ```bash
+   cd Backend/SpaceEventHub.API
+   dotnet publish -c Release -o publish
+   az webapp create --resource-group spaceeventhub-rg --plan spaceeventhub-plan --name spaceeventhub-api --runtime "DOTNET|8.0"
+   az webapp deployment source config-zip --resource-group spaceeventhub-rg --name spaceeventhub-api --src publish.zip
+   ```
+2. **Configurar variáveis**
+   ```bash
+   az webapp config appsettings set --resource-group spaceeventhub-rg --name spaceeventhub-api --settings `
+     ASPNETCORE_ENVIRONMENT=Production `
+     ConnectionStrings__DefaultConnection="sua-connection-string" `
+     JwtSettings__SecretKey="chave-secreta-32-caracteres"
+   ```
+3. **Atualizar frontend**
+   ```javascript
+   // Frontend/app.js
+   const API_BASE_URL = 'https://spaceeventhub-api.azurewebsites.net/api';
+   ```
+4. **Publicar frontend**
+   ```bash
+   az staticwebapp create --name spaceeventhub --resource-group spaceeventhub-rg --source ./Frontend --location eastus
+   ```
+
+### Linux (systemd + Nginx)
+
+```bash
+# Publicar API
+cd Backend/SpaceEventHub.API
+dotnet publish -c Release -o /var/www/spaceeventhub-api
+
+# Criar serviço systemd (resumo)
+sudo tee /etc/systemd/system/spaceeventhub.service <<'EOF'
+[Unit]
+Description=SpaceEventHub API
+
+[Service]
+WorkingDirectory=/var/www/spaceeventhub-api
+ExecStart=/usr/bin/dotnet /var/www/spaceeventhub-api/SpaceEventHub.API.dll
+Restart=always
+Environment=ASPNETCORE_ENVIRONMENT=Production
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl enable --now spaceeventhub
+
+# Servir frontend com Nginx
+sudo apt install nginx
+sudo cp -r Frontend/* /var/www/spaceeventhub
+sudo tee /etc/nginx/sites-available/spaceeventhub <<'EOF'
+server {
+    listen 80;
+    server_name espaçoeventhub.seudominio.com;
+    root /var/www/spaceeventhub;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://localhost:5000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+EOF
+sudo ln -s /etc/nginx/sites-available/spaceeventhub /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
 ## Créditos
 
 - Criado com suporte do **MANUS AI**, aproveitando arquitetura orientada a componentes, boas práticas de clean code e automação de fluxos.

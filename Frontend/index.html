@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpaceEventHub - Descubra Eventos de Tecnologia</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <a href="index.html" class="logo">SpaceEventHub</a>
+                <div class="nav-links" id="navLinks">
+                    <a href="index.html">Eventos</a>
+                    <a href="dashboard.html" id="dashboardLink" style="display: none;">Painel</a>
+                    <a href="create-event.html" id="createEventLink" style="display: none;">+ Criar Evento</a>
+                    <a href="login.html" id="loginLink">Entrar</a>
+                    <a href="register.html" id="registerLink">Cadastrar</a>
+                    <button id="logoutBtn" style="display: none;">Sair</button>
+                    <div class="notification-icon" id="notificationIcon" style="display: none;">
+                        🔔
+                        <span class="notification-badge" id="notificationBadge">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="notification-dropdown" id="notificationDropdown">
+        <div class="notification-header">
+            <h3>Notificações</h3>
+            <button id="markAllReadBtn">Marcar todas como lidas</button>
+        </div>
+        <div class="notification-list" id="notificationList">
+            <p class="no-notifications">Sem notificações</p>
+        </div>
+    </div>
+
+    <div class="hero">
+        <div class="container">
+            <h1>Descubra Eventos de Tecnologia</h1>
+            <p>Encontre e registre-se para os melhores eventos de tecnologia da sua região</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="search-section">
+            <h2>Buscar Eventos</h2>
+            <div class="search-form">
+                <input type="text" id="searchTerm" placeholder="Buscar por título ou descrição...">
+                <input type="text" id="cityFilter" placeholder="Cidade">
+                <select id="areaFilter">
+                    <option value="">Todas as Áreas</option>
+                    <option value="AI">IA</option>
+                    <option value="Backend">Backend</option>
+                    <option value="Frontend">Frontend</option>
+                    <option value="UX">UX</option>
+                    <option value="DevOps">DevOps</option>
+                    <option value="Mobile">Mobile</option>
+                    <option value="Data">Ciência de Dados</option>
+                </select>
+                <input type="date" id="fromDate" placeholder="Data Inicial">
+                <input type="date" id="toDate" placeholder="Data Final">
+                <button id="searchBtn">Buscar</button>
+                <button id="clearBtn" class="secondary">Limpar</button>
+            </div>
+        </div>
+
+        <div class="events-section">
+            <h2>Próximos Eventos</h2>
+            <div class="events-grid" id="eventsGrid">
+                <div class="loading">Carregando eventos...</div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 SpaceEventHub. Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+    <script>
+        // Track page view
+        trackPageView('/');
+
+        // Initialize navigation (includes create event link management)
+        initializeNav();
+
+        // Load events on page load
+        loadEvents();
+
+        // Search button click
+        document.getElementById('searchBtn').addEventListener('click', loadEvents);
+
+        // Clear button click
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            document.getElementById('searchTerm').value = '';
+            document.getElementById('cityFilter').value = '';
+            document.getElementById('areaFilter').value = '';
+            document.getElementById('fromDate').value = '';
+            document.getElementById('toDate').value = '';
+            loadEvents();
+        });
+
+        async function loadEvents() {
+            const searchTerm = document.getElementById('searchTerm').value;
+            const city = document.getElementById('cityFilter').value;
+            const area = document.getElementById('areaFilter').value;
+            const fromDate = document.getElementById('fromDate').value;
+            const toDate = document.getElementById('toDate').value;
+
+            const params = new URLSearchParams();
+            if (searchTerm) params.append('searchTerm', searchTerm);
+            if (city) params.append('city', city);
+            if (area) params.append('areaOfInterest', area);
+            if (fromDate) params.append('fromDate', fromDate);
+            if (toDate) params.append('toDate', toDate);
+            params.append('pageSize', '50');
+
+            try {
+                const response = await apiRequest(`/events?${params.toString()}`);
+                displayEvents(response);
+            } catch (error) {
+                console.error('Error loading events:', error);
+                document.getElementById('eventsGrid').innerHTML = '<p class="error">Falha ao carregar eventos</p>';
+            }
+        }
+
+        function displayEvents(events) {
+            const grid = document.getElementById('eventsGrid');
+            
+            if (events.length === 0) {
+                grid.innerHTML = '<p class="no-events">Nenhum evento encontrado</p>';
+                return;
+            }
+
+            grid.innerHTML = events.map(event => `
+                <div class="event-card">
+                    <div class="event-badge">${event.areaOfInterest}</div>
+                    <h3>${escapeHtml(event.title)}</h3>
+                    <p class="event-description">${escapeHtml(event.description)}</p>
+                    <div class="event-details">
+                        <div class="detail-item">
+                            <span class="icon">📅</span>
+                            <span>${formatDate(event.eventDate)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="icon">📍</span>
+                            <span>${escapeHtml(event.city)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="icon">👥</span>
+                            <span>${event.registrationCount} inscritos</span>
+                        </div>
+                    </div>
+                    <div class="event-actions">
+                        <a href="event-detail.html?id=${event.eventId}" class="btn">Ver Detalhes</a>
+                        ${event.isUserRegistered ? 
+                            '<span class="registered-badge">✓ Inscrito</span>' : 
+                            ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('pt-BR', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
